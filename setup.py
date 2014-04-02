@@ -9,5 +9,5 @@ setup(name='keepass',
       url='https://github.com/brettviren/python-keepass',
       packages=['keepass'],
       install_requires=['pycrypto'],
-      entry_points=dict(console_scripts=['keepass=keepass.newcli:main', 'keepass-%s=keepass.newcli:main' % sys.version[:3]]),
+      entry_points=dict(console_scripts=['keepass=keepass.newcli:main',]),
      )

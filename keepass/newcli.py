@@ -5,6 +5,69 @@ from optparse import OptionParser
 from getpass import getpass
 from kpdb import Database
 from infoblock import EntryInfo
+from keepass import generate_key, load_filekey
+import os
+
+
+def inputdefault(prompt, default=""):
+    "Prompt user for input, and return either default, or input"
+    data = raw_input(prompt + "[" + default + "]: ")
+    if data is '':
+        return default
+    else:
+        return data
+
+def inputYN(question, default="no"):
+    "Prompt user for input to a yes/no question"
+    out = inputdefault(question, default)
+    if out == "y" or out == "Y" or out == "yes":
+        return 1
+    else:
+        return 0
+
+def newpasswd():
+    passwd1 = getpass('Password:')
+    passwd2 = getpass('Re-type Password:')
+    while passwd1 != passwd2:
+        print "Passwords don't match!"
+        passwd1 = getpass('Password:')
+        passwd2 = getpass('Re-type Password:')
+    return passwd1
+
+def create_database(filename, options):
+    'create a keepass database and generate appropriate keyfile'
+
+    keyopt = inputdefault('Use keyfile, password, or both?', 'keyfile')
+    passwd = None
+    filekey = None
+    existing_filekey = None
+    if keyopt == 'password' or keyopt == 'both':
+        passwd = newpasswd()
+    if keyopt == 'keyfile' or keyopt == 'both':
+        if options.keyfilename is not None:
+            try:
+                filekey = load_filekey(options.keyfilename)
+            except IOError:
+                pass
+        newkey = False
+        if filekey:
+            if not inputYN('Existing keyfile found. Use it?', 'yes'):
+                filekey = generate_key()
+                newkey = True
+        else:
+            if inputYN('Existing keyfile not found. Generate?', 'yes'):
+                filekey = generate_key()
+                newkey = True
+        if newkey:
+            print 'Saving filekey to {}'.format(options.keyfilename)
+            keyfile = file(options.keyfilename, 'w+')
+            keyfile.write(filekey)
+            keyfile.close()
+
+    db = Database(None, filekey=filekey, passphrase=passwd)
+    db.add_group('default')
+    db.write(filename)
+    return passwd
 
 
 def main():
@@ -43,19 +106,28 @@ def main():
     if command == 'add' and len(args) < 4:
         parser.error("incorrect number of arguments for command 'add'")
 
+    if not os.access(filename, os.F_OK):
+        if inputYN('Database does not exist. Create?', default='yes'):
+            options.passphrase = create_database(filename, options)
+        else:
+            sys.exit(4)
 
     if options.passphrase == 'ask' or not (options.passphrase or options.keyfilename):
         options.passphrase = getpass()
 
     filekey = None
     if options.keyfilename:
-        infile = file(options.keyfilename)
-        filekey = infile.read().strip().decode('hex')
-        infile.close()
+        filekey = load_filekey(options.keyfilename)
 
     db = Database(filename, filekey=filekey, passphrase=options.passphrase)
     
     if command == 'list':
+        print 'Groups:'
+        for group in db.groups:
+            print group.group_name
+
+        print
+        print 'Entries:'
         print("{0:20} {1:15} {2:20} {3:20}".format("Group", "Title", "Username", "URL"))
         for entry in db.entries:
             if hasattr(entry, 'title') and entry.title == 'Meta-Info':
@@ -85,6 +157,9 @@ def main():
             db.entries.append(entry)
         for (key, value) in setpairs.items():
             setattr(entry, key, value)
+        if not hasattr(entry, 'groupid'):
+            entry.groupid = 0
+
         db.write()
 
     elif command == 'del':

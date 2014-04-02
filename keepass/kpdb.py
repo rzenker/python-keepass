@@ -17,6 +17,7 @@ import sys, struct, hashlib
 from header import DBHDR
 from infoblock import GroupInfo, EntryInfo
 from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
 
 
 class Database(object):
@@ -211,6 +212,9 @@ class Database(object):
         self.header.ngroups = len(self.groups)
         self.header.nentries = len(self.entries)
 
+        self.header.final_master_seed = get_random_bytes(16)
+        self.header.encryption_iv = get_random_bytes(16)
+        self.header.transform_seed = get_random_bytes(32)
         header = DBHDR(self.header.encode())
 
         # fixme: should regenerate encryption_iv, master_seed,
@@ -219,10 +223,6 @@ class Database(object):
         payload = self.encode_payload()
         header.contents_hash = hashlib.sha256(payload).digest()
 
-#        finalkey = self.final_key(masterkey = masterkey or self.masterkey,
-#                                  masterseed = self.header.master_seed,
-#                                  masterseed2 = self.header.master_seed2,
-#                                  rounds = self.header.key_enc_rounds)
 
         payload = self.encrypt_payload(payload, self.final_key(), 
                                        header.encryption_type(),
@@ -311,11 +311,23 @@ class Database(object):
 
     def gen_uuid(self):
         "Generate 16 bytes of randomness suitable for an entry's UUID"
-        return 4                # only call once
+        return get_random_bytes(16)
 
     def gen_groupid(self):
         "Generate 4 bytes of randomness suitable for a group's unique group id"
-        return 4                # only call once
+        return get_random_bytes(4)
+
+    def get_group_by_name(self, name):
+        for group in self.groups:
+            if group.group_name == name:
+                return group
+        return None
+
+    def add_group(self, name):
+
+        group = GroupInfo()
+        group.group_name = name
+        self.groups.append(group)
 
     def add_entry(self,path,title,username,password,url="",notes="",imageid=1,append=True):
         '''

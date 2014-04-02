@@ -8,6 +8,8 @@ import struct, uuid
 from collections import OrderedDict
 from datetime import datetime
 
+from Crypto.Random import get_random_bytes
+
 # return tupleof (decode,encode) functions
 
 def null_de(): return (lambda buf:None, lambda val:None)
@@ -198,21 +200,23 @@ Notes:
   '''
 
     format = OrderedDict([
-        (0x0, ('ignored',null_de(), None)),
-        (0x1, ('groupid',int_de(), None)),
-        (0x2, ('group_name',string_de(), None)),
-        (0x3, ('creation_time',date_de(), None)),
-        (0x4, ('lastmod_time',date_de(), None)),
-        (0x5, ('lastacc_time',date_de(), None)),
-        (0x6, ('expire_time',date_de(), None)),
-        (0x7, ('imageid',int_de(), None)),
-        (0x8, ('level',short_de(), None)),
-        (0x9, ('flags',int_de(), None)),
-        (0xFFFF, (None, None, None)),
+        (0x0, ('ignored',null_de(), lambda: None)),
+        (0x1, ('groupid',int_de(), lambda: 0)),
+        (0x2, ('group_name',string_de(), lambda: 'unknown')),
+        (0x3, ('creation_time',date_de(), datetime.now )),
+        (0x4, ('lastmod_time',date_de(), datetime.now )),
+        (0x5, ('lastacc_time',date_de(), datetime.now )),
+        (0x6, ('expire_time',date_de(), lambda: datetime(2999, 12, 28, 0, 0) )),
+        (0x7, ('imageid',int_de(), lambda: 0)),
+        (0x8, ('level',short_de(), lambda: 0)),
+        (0x9, ('flags',int_de(), lambda: 0)),
+        (0xFFFF, (None, None, lambda: None)),
         ])
 
     def __init__(self,string=None):
         super(GroupInfo,self).__init__(GroupInfo.format,string)
+        if self.groupid is None:
+            self.groupid = get_random_bytes(4)
         return
 
     def name(self):

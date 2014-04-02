@@ -37,6 +37,8 @@ Notes:
   * PlainContents = Decrypt_with_FinalKey(DatabaseFile - DatabaseHeader)
 '''
 
+from Crypto.Random import get_random_bytes
+
 class DBHDR(object):
     '''
     Interface to the database header chunk.
@@ -58,6 +60,7 @@ class DBHDR(object):
     
     signatures = (0x9AA2D903,0xB54BFB65)
     length = 124
+    version1 = 0x00030002
 
     encryption_flags = (
         ('SHA2',1),
@@ -69,8 +72,19 @@ class DBHDR(object):
 
     def __init__(self,buf=None):
         'Create a header, read self from binary string if given'
-        if buf: self.decode(buf)
-        return
+
+        if buf:
+            self.decode(buf)
+        else:
+            (self.signature1, self.signature2) = self.signatures
+            self.flags = 3 # SHA2 + Rijndael seems to be the standard here
+            self.version = self.version1
+            self.final_master_seed = get_random_bytes(16)
+            self.encryption_iv = get_random_bytes(16)
+            self.transform_seed = get_random_bytes(32)
+
+            self.contents_hash = ''
+            self.transform_rounds = 50000
 
     def __str__(self):
         ret = ['Header:']
